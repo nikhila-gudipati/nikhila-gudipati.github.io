@@ -72,7 +72,7 @@
   }
 
   .meal-card.selected {
-    border: 2px solid #81B29A; /* highlight color */
+    border: 2px solid #81B29A;
   }
 
   .meal-card h3 {
@@ -90,7 +90,7 @@
 
   .meal-quadrants div span.heading {
     font-weight: bold;
-    color: #E07A5F; /* Burnt Sienna */
+    color: #E07A5F;
     display: block;
     font-size: 0.95em;
   }
@@ -140,12 +140,14 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      align-items: center; /* center categories */
     }
 
     .category-header {
-      width: 90%;
+      width: 80vw; /* 80% of screen width */
       cursor: pointer;
       padding-right: 30px; /* space for arrow */
+      box-sizing: border-box;
     }
 
     /* L-shaped 45deg arrow */
@@ -166,6 +168,8 @@
       padding: 10px 0;
       flex-direction: column;
       gap: 10px;
+      width: 80vw; /* match category width */
+      margin: 0 auto;
     }
 
     .category.active .meals-column {
