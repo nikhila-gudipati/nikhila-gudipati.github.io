@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meal Planner Dashboard</title>
+<style>
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    margin: 0;
+    padding: 20px;
+    background-color: #F4F1DE;
+    display: flex;
+    justify-content: center;
+  }
+
+  .wrapper {
+    width: 90%;
+    max-width: 1400px;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  #categories-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    padding-bottom: 20px;
+  }
+
+  .category {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .category-header {
+    border: 1px dotted #81B29A;
+    padding: 5px 10px;
+    display: inline-block;
+    margin-bottom: 5px;
+    position: relative;
+  }
+
+  .category-header h2 {
+    color: #477d63;
+    font-weight: bold;
+    margin: 0 0 3px 0;
+  }
+
+  .category-header p {
+    margin: 0;
+    font-weight: normal;
+  }
+
+  .meals-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .meal-card {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    padding: 10px;
+    cursor: pointer;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .meal-card.selected {
+    border: 2px solid #81B29A; /* highlight color */
+  }
+
+  .meal-card h3 {
+    text-align: center;
+    margin: 0 0 5px 0;
+    font-size: 0.95em;
+  }
+
+  .meal-quadrants {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 10px;
+  }
+
+  .meal-quadrants div span.heading {
+    font-weight: bold;
+    color: #E07A5F; /* Burnt Sienna */
+    display: block;
+    font-size: 0.95em;
+  }
+  
+  .meal-quadrants div span.ingredients {
+    color: #3D405B;
+    display: block;
+    font-size: 0.8em;
+    margin-top: 2px;
+  }
+
+  /* Floating selected meals counter */
+  #selected-count {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(244, 241, 222, 0.9);
+    border: 1px solid #81B29A;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    z-index: 1000;
+  }
+
+  /* Grocery button styling */
+  #generate-btn {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 16px;
+    font-size: 1em;
+    cursor: pointer;
+    background-color: #81B29A;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+    transition: all 0.2s ease-in-out;
+  }
+  #generate-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 4px 4px 8px rgba(0,0,0,0.3);
+  }
+
+  /* Mobile: dropdown style */
+  @media (max-width: 768px) {
+    #categories-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .category-header {
+      width: 100%;
+      cursor: pointer;
+      padding-right: 30px; /* space for arrow */
+    }
+
+    /* L-shaped 45deg arrow */
+    .category-header::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border-bottom: 2px solid #81B29A;
+      border-right: 2px solid #81B29A;
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .meals-column {
+      display: none;
+      padding: 10px 0;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .category.active .meals-column {
+      display: flex;
+    }
+
+    .meal-card {
+      width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+  <h1>Meal Planner Dashboard</h1>
+  <div id="categories-container"></div>
+  <h2>Grocery List</h2>
+  <button id="generate-btn">Generate Grocery List</button>
+  <ul id="grocery-list"></ul>
+  <p id="selected-count">Selected Meals: 0 / 7</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+const MAX_SELECTION = 7;
+let selectedMeals = [];
+const categoriesContainer = document.getElementById("categories-container");
+const selectedCount = document.getElementById("selected-count");
+const generateBtn = document.getElementById("generate-btn");
+const groceryListUl = document.getElementById("grocery-list");
+
+const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRve-7FlrNw-LiD7lPCUyU4ZjQKa8W-vJI4s2utYk5d2rzXM6ZALKN3VBL-5znqoExocKY2e3QttAzS/pub?output=csv";
+
+fetch(sheetUrl)
+  .then(res => res.text())
+  .then(csvText => {
+    const data = Papa.parse(csvText, { header: true }).data;
+    const meals = data.map(row => ({
+      category: row["Category"],
+      description: row["Desc"] || "",
+      name: row["Meal Name"] || row["Meal"] || "",
+      ingredients: {
+        protein: row["Protein"] ? row["Protein"].split(",").map(i => i.trim()).filter(Boolean) : [],
+        fibre: row["Fibre"] ? row["Fibre"].split(",").map(i => i.trim()).filter(Boolean) : [],
+        carb: row["Carb"] ? row["Carb"].split(",").map(i => i.trim()).filter(Boolean) : [],
+        salad: row["Salad"] ? row["Salad"].split(",").map(i => i.trim()).filter(Boolean) : []
+      }
+    }));
+    renderMeals(meals);
+  })
+  .catch(err => console.error("Error fetching CSV:", err));
+
+function renderMeals(meals) {
+  const categories = [...new Set(meals.map(m => m.category))];
+  categoriesContainer.innerHTML = "";
+
+  categories.forEach(cat => {
+    const catDiv = document.createElement("div");
+    catDiv.classList.add("category");
+
+    const catMeals = meals.filter(m => m.category === cat);
+    const catDesc = catMeals[0]?.description || "";
+
+    // Category header box
+    const catHeader = document.createElement("div");
+    catHeader.classList.add("category-header");
+
+    const catTitle = document.createElement("h2");
+    catTitle.textContent = cat;
+    catHeader.appendChild(catTitle);
+
+    if(catDesc) {
+      const descEl = document.createElement("p");
+      descEl.textContent = catDesc;
+      catHeader.appendChild(descEl);
+    }
+
+    // Toggle meals on mobile
+    catHeader.addEventListener("click", () => {
+      catDiv.classList.toggle("active");
+    });
+
+    catDiv.appendChild(catHeader);
+
+    // Meal cards column
+    const mealsCol = document.createElement("div");
+    mealsCol.classList.add("meals-column");
+
+    catMeals.forEach(meal => {
+      const card = document.createElement("div");
+      card.classList.add("meal-card");
+
+      const quadrants = `
+        <div class="meal-quadrants">
+          <div>${meal.ingredients.protein.length ? `<span class="heading">Protein</span><span class="ingredients">${meal.ingredients.protein.join(", ")}</span>` : ""}</div>
+          <div>${meal.ingredients.fibre.length ? `<span class="heading">Fibre</span><span class="ingredients">${meal.ingredients.fibre.join(", ")}</span>` : ""}</div>
+          <div>${meal.ingredients.carb.length ? `<span class="heading">Carb</span><span class="ingredients">${meal.ingredients.carb.join(", ")}</span>` : ""}</div>
+          <div>${meal.ingredients.salad.length ? `<span class="heading">Salad</span><span class="ingredients">${meal.ingredients.salad.join(", ")}</span>` : ""}</div>
+        </div>
+      `;
+
+      card.innerHTML = `<h3>${meal.name}</h3>` + quadrants;
+
+      card.addEventListener("click", () => {
+        if(card.classList.contains("selected")) {
+          card.classList.remove("selected");
+          selectedMeals = selectedMeals.filter(m => m.name !== meal.name);
+        } else {
+          if(selectedMeals.length < MAX_SELECTION) {
+            card.classList.add("selected");
+            selectedMeals.push(meal);
+          } else {
+            alert(`You can select maximum ${MAX_SELECTION} meals.`);
+          }
+        }
+        selectedCount.textContent = `Selected Meals: ${selectedMeals.length} / ${MAX_SELECTION}`;
+      });
+
+      mealsCol.appendChild(card);
+    });
+
+    catDiv.appendChild(mealsCol);
+    categoriesContainer.appendChild(catDiv);
+  });
+}
+
+generateBtn.addEventListener("click", () => {
+  const grocerySet = new Set();
+  selectedMeals.forEach(meal => {
+    Object.values(meal.ingredients).forEach(items => {
+      items.forEach(item => grocerySet.add(item));
+    });
+  });
+
+  groceryListUl.innerHTML = "";
+  Array.from(grocerySet).sort().forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    groceryListUl.appendChild(li);
+  });
+});
+</script>
+
+</body>
+</html>
