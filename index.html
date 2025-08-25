@@ -169,6 +169,55 @@
       color: white;
       text-align: left;
     }
+
+    .day-selector {
+      margin-top: 8px;
+      display: none;
+    }
+    .day-selector select {
+      width: 100%;
+      padding: 4px 6px;   /* slightly smaller padding */
+      border: 1px solid #81B29A;
+      border-radius: 0;
+      background: #fff;
+      font-family: inherit;
+      font-size: 0.75em;  /* smaller font size */
+      color: #3D405B;
+      cursor: pointer;
+      appearance: none;
+    }
+    
+    .day-selector select option {
+      font-size: 0.75em;  /* shrink dropdown items too */
+    }
+    
+    .day-selector select:hover,
+    .day-selector select:focus {
+      border-color: #3D405B;
+      outline: none;
+    }
+    
+    
+    /*Week PLan Table*/
+    .weekly-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    
+    .weekly-table th,
+    .weekly-table td {
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      font-size: 0.9em;
+      text-align: center;
+    }
+    
+    .weekly-table th {
+      background-color: #81B29A;
+      color: #fff;
+    }
+    
     /* Mobile: dropdown style */
     @media (max-width: 768px) {
       #categories-container, #fruits-container {
@@ -183,7 +232,7 @@
         padding-right: 30px;
         box-sizing: border-box;
       }
-      .category-header::after, .fruit-header::after {
+      .category-header::after, .fruit-header::after, .breakfast-header::after {
         content: "";
         position: absolute;
         right: 10px;
@@ -194,7 +243,7 @@
         border-right: 2px solid #81B29A;
         transform: translateY(-50%) rotate(45deg);
       }
-      .meals-column, .fruits-column {
+      .meals-column, .fruits-column, .breakfast-column {
         display: none;
         padding: 10px 0;
         gap: 10px;
@@ -202,11 +251,11 @@
         margin: 0 auto;
       }
       .category.active .meals-column,
-      .fruit.active .fruits-column {
+      .fruit.active .fruits-column, .breakfast.active .breakfast-column {
         display: grid;
         grid-template-columns: 1fr 1fr; /* 2 per row */
       }
-      .meal-card, .fruit-card {
+      .meal-card, .fruit-card, .breakfast-card {
         width: 100%;
       }
     }
@@ -224,7 +273,7 @@
     <button id="generate-btn">Generate Grocery List</button>
     <table id="grocery-list"></table>
     <p id="selected-count">Selected Meals: 0 / 7 | Selected Fruits: 0 / 7 | Selected Brealfast: 0/7</p>
-
+    <div id="weekly-plan"></div>
 
   </div>
 
@@ -234,6 +283,12 @@
     let selectedMeals = [];
     let selectedFruits = [];
     let selectedBreakfast = [];
+
+    const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    let dayAssignments = {}; 
+    daysOfWeek.forEach(day => {
+     dayAssignments[day] = { meals: [], breakfast: [] };
+      });
 
     const categoriesContainer = document.getElementById("categories-container");
     const breakfastContainer = document.getElementById("breakfast-container");
@@ -245,7 +300,38 @@
     const mealSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRve-7FlrNw-LiD7lPCUyU4ZjQKa8W-vJI4s2utYk5d2rzXM6ZALKN3VBL-5znqoExocKY2e3QttAzS/pub?gid=1506494154&single=true&output=csv";
     const breakfastSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRve-7FlrNw-LiD7lPCUyU4ZjQKa8W-vJI4s2utYk5d2rzXM6ZALKN3VBL-5znqoExocKY2e3QttAzS/pub?gid=733060218&single=true&output=csv";
     const fruitSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRve-7FlrNw-LiD7lPCUyU4ZjQKa8W-vJI4s2utYk5d2rzXM6ZALKN3VBL-5znqoExocKY2e3QttAzS/pub?gid=1442724610&single=true&output=csv";
-
+    //Render weekly table
+    function renderWeeklyPlan() {
+      const container = document.getElementById("weekly-plan");
+      container.innerHTML = "<h2>Weekly Plan</h2>";
+    
+      const table = document.createElement("table");
+      table.classList.add("weekly-table");
+    
+      // Table header
+      const header = document.createElement("tr");
+      header.innerHTML = "<th>Day</th><th>Breakfast</th><th>Meal</th>";
+      table.appendChild(header);
+    
+      // Each day row
+      daysOfWeek.forEach(day => {
+        const row = document.createElement("tr");
+    
+        const breakfastList = dayAssignments[day].breakfast.map(item => item.name).join(", ");
+        const mealList = dayAssignments[day].meals.map(item => item.name).join(", ");
+    
+        row.innerHTML = `
+          <td>${day}</td>
+          <td>${breakfastList || "-"}</td>
+          <td>${mealList || "-"}</td>
+        `;
+        table.appendChild(row);
+      });
+    
+      container.appendChild(table);
+    }
+    
+    
     // Load meals
     fetch(mealSheetUrl)
       .then(res => res.text())
@@ -296,7 +382,14 @@
               <div>${meal.ingredients.carb.length ? `<span class="heading">Carb</span><span class="ingredients">${meal.ingredients.carb.join(", ")}</span>` : ""}</div>
               <div>${meal.ingredients.salad.length ? `<span class="heading">Salad</span><span class="ingredients">${meal.ingredients.salad.join(", ")}</span>` : ""}</div>
             </div>
+            <div class="day-selector">
+              <select>
+                <option value="">Assign</option>
+                ${daysOfWeek.map(day => `<option value="${day}">${day}</option>`).join("")}
+              </select>
+            </div>
           `;
+
           card.addEventListener("click", () => toggleMeal(card, meal));
           mealsCol.appendChild(card);
         });
@@ -307,19 +400,41 @@
     }
 
     function toggleMeal(card, meal) {
+      const dropdown = card.querySelector(".day-selector");
+      const select = dropdown.querySelector("select");
+    
       if (card.classList.contains("selected")) {
         card.classList.remove("selected");
+        dropdown.style.display = "none";
+        select.value = "";
         selectedMeals = selectedMeals.filter(m => m.name !== meal.name);
+        daysOfWeek.forEach(day => {
+          dayAssignments[day].meals = dayAssignments[day].meals.filter(m => m.name !== meal.name);
+        });
       } else {
         if (selectedMeals.length < MAX_SELECTION) {
           card.classList.add("selected");
           selectedMeals.push(meal);
+          dropdown.style.display = "block";
+    
+          select.onchange = () => {
+            const chosenDay = select.value;
+            if (chosenDay) {
+              daysOfWeek.forEach(day => {
+                dayAssignments[day].meals = dayAssignments[day].meals.filter(m => m.name !== meal.name);
+              });
+              dayAssignments[chosenDay].meals.push(meal);
+              renderWeeklyPlan();
+            }
+          };
         } else {
           alert(`You can select maximum ${MAX_SELECTION} meals.`);
         }
       }
       updateCounter();
+      renderWeeklyPlan();
     }
+    
 
     // Load breakfast
     fetch(breakfastSheetUrl)
@@ -328,12 +443,13 @@
         const data = Papa.parse(csvText, { header: true }).data;
         const breakfast = data
           .map((row, idx) => ({
+            name: row["BName"]?.trim() || `Breakfast ${idx + 1}`,
             ingredients: row["Ingredients"] 
-              ? row["Ingredients"].split(",").map(f => f.trim()).filter(Boolean): [],
-            BName: row["BName"] 
-              ? row["BName"].split(",").map(f => f.trim()).filter(Boolean): []
+              ? row["Ingredients"].split(",").map(f => f.trim()).filter(Boolean)
+              : []
           }))
           .filter(f => f.ingredients.length);
+
         renderBreakfast(breakfast);
       })
       .catch(err => console.error("Error fetching breakfast:", err));
@@ -356,8 +472,15 @@
         const card = document.createElement("div");
         card.classList.add("breakfast-card");
         card.innerHTML = `
-          <h3>${breakfast.BName}</h3>
+          <h3>${breakfast.name}</h3>
           <div class="breakfast-ingredients">${breakfast.ingredients.join("<br>")}</div>
+          <div class="day-selector">
+          <select>
+            <option value=""> Assign </option>
+            ${daysOfWeek.map(day => `<option value="${day}">${day}</option>`).join("")}
+          </select>
+        </div>
+
         `;
         card.addEventListener("click", () => toggleBreakfast(card, breakfast));
         breakfastCol.appendChild(card);
@@ -367,20 +490,49 @@
       breakfastContainer.appendChild(breakfastDiv);
     }
 
-    function toggleBreakfast(card, breakfast) {
+    function toggleBreakfast(card, item) {
+      const dropdown = card.querySelector(".day-selector");
+      const select = dropdown.querySelector("select");
+    
       if (card.classList.contains("selected")) {
+        // Deselect
         card.classList.remove("selected");
-        selectedBreakfast = selectedBreakfast.filter(f => f !== breakfast);
+        dropdown.style.display = "none";
+        select.value = "";
+        selectedBreakfast = selectedBreakfast.filter(b => b.name !== item.name);
+    
+        // Remove from all days
+        daysOfWeek.forEach(day => {
+          dayAssignments[day].breakfast = dayAssignments[day].breakfast.filter(b => b.name !== item.name);
+        });
       } else {
         if (selectedBreakfast.length < MAX_SELECTION) {
+          // Select
           card.classList.add("selected");
-          selectedBreakfast.push(breakfast);
+          selectedBreakfast.push(item);
+          dropdown.style.display = "block";
+    
+          // Assign day when user picks from dropdown
+          select.onchange = () => {
+            const chosenDay = select.value;
+            if (chosenDay) {
+              // Remove from other days before reassigning
+              daysOfWeek.forEach(day => {
+                dayAssignments[day].breakfast = dayAssignments[day].breakfast.filter(b => b.name !== item.name);
+              });
+              dayAssignments[chosenDay].breakfast.push(item);
+              renderWeeklyPlan();
+            }
+          };
         } else {
-          alert(`You can select maximum ${MAX_SELECTION} breakfast meals.`);
+          alert(`You can select maximum ${MAX_SELECTION} breakfast items.`);
         }
       }
       updateCounter();
+      renderWeeklyPlan();
     }
+    
+    
 
     // Load fruits
     fetch(fruitSheetUrl)
@@ -470,7 +622,7 @@
             ingredientMap[item] = { count: 0, meals: [] };
           }
           ingredientMap[item].count++;
-          ingredientMap[item].meals.push(breakfast.BName);
+          ingredientMap[item].meals.push(breakfast.name);
           });
         });
 
